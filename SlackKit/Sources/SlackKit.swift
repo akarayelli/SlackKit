@@ -25,23 +25,16 @@ import Foundation
 #if !COCOAPODS
 @_exported import SKClient
 @_exported import SKCore
-@_exported import SKRTMAPI
-@_exported import SKServer
 @_exported import SKWebAPI
 #endif
 
-public final class SlackKit: RTMAdapter {
+public final class SlackKit {
 
     public typealias EventClosure = (Event, ClientConnection?) -> Void
     internal typealias TypedEvent = (EventType, EventClosure)
     internal var callbacks = [TypedEvent]()
-    internal(set) public var server: SKServer?
     internal(set) public var clients: [String: ClientConnection] = [:]
 
-    /// Return the `SKRTMAPI` instance of the first client
-    public var rtm: SKRTMAPI? {
-        return clients.values.first?.rtm
-    }
     /// Return the `WebAPI` instance of the first client
     public var webAPI: WebAPI? {
         return clients.values.first?.webAPI
@@ -54,62 +47,9 @@ public final class SlackKit: RTMAdapter {
         if let clientConnection = clients[token] {
             clientConnection.webAPI = webAPI
         } else {
-            clients[token] = ClientConnection(client: nil, rtm: nil, webAPI: webAPI)
+            clients[token] = ClientConnection(client: nil, webAPI: webAPI)
         }
     }
-
-    public func addRTMBotWithAPIToken(
-        _ token: String,
-        client: Client? = Client(),
-        options: RTMOptions = RTMOptions(),
-        rtm: RTMWebSocket? = nil
-    ) {
-        let rtm = SKRTMAPI(withAPIToken: token, options: options, rtm: rtm)
-        rtm.adapter = self
-
-        if let clientConnection = clients[token] {
-            clientConnection.rtm = rtm
-        } else {
-            clients[token] = ClientConnection(client: client, rtm: rtm, webAPI: nil)
-        }
-        clients[token]?.rtm?.connect()
-    }
-
-    public func addServer(_ server: SlackKitServer? = nil, responder: SlackKitResponder? = nil, oauth: OAuthConfig? = nil) {
-        var responder: SlackKitResponder = responder ?? SlackKitResponder(routes: [])
-        if let oauth = oauth {
-            responder.routes.append(oauthRequestRoute(config: oauth))
-        }
-        self.server = SKServer(server: server, responder: responder)
-        self.server?.start()
-    }
-
-    private func oauthRequestRoute(config: OAuthConfig) -> RequestRoute {
-        let oauth = OAuthMiddleware(config: config) { authorization in
-            // User
-            if let token = authorization.accessToken {
-                self.addWebAPIAccessWithToken(token)
-            }
-            // Bot User
-            if let token = authorization.bot?.botToken {
-                self.addRTMBotWithAPIToken(token)
-            }
-        }
-        return RequestRoute(path: "/oauth", middleware: oauth)
-    }
-
-    // MARK: - RTM Adapter
-    public func initialSetup(json: [String: Any], instance: SKRTMAPI) {
-        clients[instance.token]?.client?.initialSetup(JSON: json)
-    }
-
-    public func notificationForEvent(_ event: Event, type: EventType, instance: SKRTMAPI) {
-        let clientConnection = clients[instance.token]
-        clientConnection?.client?.notificationForEvent(event, type: type)
-        executeCallbackForEvent(event, type: type, clientConnection: clientConnection)
-    }
-
-    public func connectionClosed(with error: Error, instance: SKRTMAPI) {}
 
     // MARK: - Callbacks
     public func notificationForEvent(_ type: EventType, event: @escaping EventClosure) {

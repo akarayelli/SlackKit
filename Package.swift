@@ -8,6 +8,7 @@ let package = Package(
         .macOS(.v10_15), .iOS(.v10), .tvOS(.v10)
     ],
     products: [
+        .library(name: "SlackKit", targets: ["SlackKit"]),
         .library(name: "SKClient", targets: ["SKClient"]),
         .library(name: "SKCore", targets: ["SKCore"]),
         .library(name: "SKWebAPI", targets: ["SKWebAPI"])
@@ -15,6 +16,9 @@ let package = Package(
     dependencies: [
     ],
     targets: [
+        .target(name: "SlackKit",
+                dependencies: ["SKCore", "SKClient", "SKWebAPI"],
+                path: "SlackKit/Sources"),
         .target(name: "SKClient",
                 dependencies: ["SKCore"],
                 path: "SKClient/Sources"),
